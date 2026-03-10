@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
 				inline_keyboard: [[
 					{
 						text: `📬 Open Inbox to Reply`,
-						url: `https://unrationalizing-nonrecurently-alyse.ngrok-free.dev`
+						url: `${process.env.NEXT_PUBLIC_BASE_URL}/inbox?id=${scanner_tg_id}`
 					}
 				]]
 			};
