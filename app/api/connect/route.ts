@@ -14,15 +14,60 @@ export async function POST(req: NextRequest) {
 		const formData = await req.formData();
 
 		const scanner_tg_id = formData.get('scanner_tg_id') as string;
-		const scanned_tg_id = formData.get('scanned_tg_id') as string;
+		let raw_scanned_tg_id = formData.get('scanned_tg_id') as string;
+
+		let scanned_id_for_db = raw_scanned_tg_id;
+		let scanned_username = '';
+
+		// 1. qrData 包含 | (例如 "123456789|alanvanderboo")
+		if (raw_scanned_tg_id.includes('|')) {
+			const parts = raw_scanned_tg_id.split('|');
+			scanned_id_for_db = parts[0];
+			scanned_username = parts[1] || '';
+		}
+		// 2. 扫的是 Bot 生成的带参数链接 (https://t.me/Bot?start=123456)
+		else if (raw_scanned_tg_id.includes('start=')) {
+			scanned_id_for_db = raw_scanned_tg_id.split('start=')[1].split('&')[0];
+		}
+		// 3. 扫的是个人资料链接 (https://t.me/alanvanderboo)
+		else if (raw_scanned_tg_id.includes('t.me/')) {
+			scanned_username = raw_scanned_tg_id.split('t.me/')[1].split('/')[0].split('?')[0];
+			scanned_id_for_db = `@${scanned_username}`;
+		} 
+		// 4. 用户名 (@alanvanderboo)
+		else if (raw_scanned_tg_id.startsWith('@')) {
+			scanned_username = raw_scanned_tg_id.substring(1);
+			scanned_id_for_db = raw_scanned_tg_id;
+		}
+
 		const message = formData.get('message') as string;
 		const photo = formData.get('photo') as File | null;
 
-		if (!scanner_tg_id || !scanned_tg_id || !photo) {
+		if (!scanner_tg_id || !scanned_id_for_db || !photo) {
 			return NextResponse.json(
 				{ error: 'Missing required fields' },
 				{ status: 400 }
 			);
+		}
+
+		// --- Fetch real profiles from Telegram ---
+		let scannerName = "Someone";
+		let scannerUsername = "";
+		try {
+			const scannerChat = await bot.telegram.getChat(scanner_tg_id) as any;
+			scannerName = [scannerChat.first_name, scannerChat.last_name].filter(Boolean).join(' ') || "Someone";
+			scannerUsername = scannerChat.username || '';
+		} catch (e) {
+			console.log('Could not fetch scanner profile', e);
+		}
+
+		let scannedName = "the person you scanned";
+		try {
+			const scannedChat = await bot.telegram.getChat(scanned_id_for_db) as any;
+			scannedName = [scannedChat.first_name, scannedChat.last_name].filter(Boolean).join(' ') || scannedName;
+			scanned_username = scannedChat.username || scanned_username;
+		} catch (e) {
+			console.log('Could not fetch scanned profile', e);
 		}
 
 		// 1. Upload photo to Supabase
@@ -57,8 +102,8 @@ export async function POST(req: NextRequest) {
 			.from('connections')
 			.insert([
 				{
-					scanner_tg_id,
-					scanned_tg_id,
+					scanner_tg_id: scanner_tg_id,
+					scanned_tg_id: scanned_id_for_db,
 					message,
 					image_url: publicUrl,
 				}
@@ -72,13 +117,46 @@ export async function POST(req: NextRequest) {
 		}
 
 		// 3. Send Telegram Messages to both users
-		const caption = `🤝 New Connection!\n\nMessage: "${message}"\n\nNice meeting you!`;
+		const preFilledText = encodeURIComponent(`Hey! Nice to meet you at the event! 🚀\n\nMessage: "${message}"\n\nHere is our photo.`);
 
-		// Use Promise.allSettled to ensure failure on one doesn't crash the other,
-		// though ideally we notify both.
+		// 构建给 Scanner 的消息 Keyboard
+		let scannerMarkup = undefined;
+		if (scanned_username) {
+			scannerMarkup = {
+				inline_keyboard: [[
+					{ 
+						text: `💬 Chat with ${scannedName}`, 
+						url: `https://t.me/${scanned_username}?text=${preFilledText}` 
+					}
+				]]
+			};
+		}
+
+		// 构建给 Scanned 的消息 Keyboard
+		let scannedMarkup = undefined;
+		if (scannerUsername) {
+			scannedMarkup = {
+				inline_keyboard: [[
+					{
+						text: `💬 Chat with ${scannerName}`,
+						url: `https://t.me/${scannerUsername}?text=${preFilledText}`
+					}
+				]]
+			};
+		}
+
+		// Use Promise.allSettled to ensure failure on one doesn't crash the other
 		const results = await Promise.allSettled([
-			bot.telegram.sendPhoto(scanner_tg_id, publicUrl, { caption }),
-			bot.telegram.sendPhoto(scanned_tg_id, publicUrl, { caption })
+			// 1. 给 Scanner (扫码的人 - 你) 发送
+			bot.telegram.sendPhoto(scanner_tg_id, publicUrl, {
+				caption: `✅ You connected with ${scannedName}!\n\nMessage: "${message}"`,
+				reply_markup: scannerMarkup
+			}),
+			// 2. 给 Scanned (被扫的人 - 对方) 发送
+			bot.telegram.sendPhoto(scanned_id_for_db, publicUrl, {
+				caption: `📸 New connection! ${scannerName} just scanned you.\n\nMessage: "${message}"`,
+				reply_markup: scannedMarkup
+			})
 		]);
 
 		// Log if there's any telegram sending issue (usually user blocked bot, or not started)
