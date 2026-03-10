@@ -17,7 +17,7 @@ interface InboxRequest {
 }
 
 export default function InboxPage() {
-  const { user } = useTelegram();
+  const { user, webApp } = useTelegram();
   const [requests, setRequests] = useState<InboxRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<InboxRequest | null>(null);
@@ -129,11 +129,29 @@ export default function InboxPage() {
     setDraftedReply(draft);
   };
 
-  const handleReplyTelegram = () => {
+  const handleReplyTelegram = async () => {
     if (!selectedRequest) return;
-    const encodedReply = encodeURIComponent(draftedReply || "Gm! Got your connection! ☕️");
+    const finalReply = draftedReply || "Gm! Got your connection! ☕️";
     const targetHandle = selectedRequest.handle.replace('@', '');
-    window.open(`https://t.me/${targetHandle}?text=${encodedReply}`, '_blank');
+    
+    // Telegram restricts prefilling messages to human individuals for anti-spam reasons. 
+    // The standard Mini App UX workaround is to drop it into the user's device clipboard.
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(finalReply);
+      }
+    } catch (e) {
+      console.warn("Clipboard failed", e);
+    }
+
+    if (webApp) {
+      webApp.showAlert('Message copied to clipboard! 📋\n\nJust hit paste when the chat opens.', () => {
+         webApp.openTelegramLink(`https://t.me/${targetHandle}`);
+      });
+    } else {
+      alert('Message copied to clipboard! 📋\n\nJust hit paste when the chat opens.');
+      window.open(`https://t.me/${targetHandle}`, '_blank');
+    }
   };
 
   // ----- Detail View Render -----
