@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 		else if (raw_scanned_tg_id.includes('t.me/')) {
 			scanned_username = raw_scanned_tg_id.split('t.me/')[1].split('/')[0].split('?')[0];
 			scanned_id_for_db = `@${scanned_username}`;
-		} 
+		}
 		// 4. 用户名 (@alanvanderboo)
 		else if (raw_scanned_tg_id.startsWith('@')) {
 			scanned_username = raw_scanned_tg_id.substring(1);
@@ -126,9 +126,9 @@ export async function POST(req: NextRequest) {
 		if (scanned_username) {
 			scannerMarkup = {
 				inline_keyboard: [[
-					{ 
-						text: `💬 Send Intro to @${scanned_username}`, 
-						url: `https://t.me/${scanned_username}?text=${encodedIntro}` 
+					{
+						text: `💬 Send Intro to @${scanned_username}`,
+						url: `https://t.me/${scanned_username}?text=${encodedIntro}`
 					}
 				]]
 			};
@@ -140,14 +140,15 @@ export async function POST(req: NextRequest) {
 			scannedMarkup = {
 				inline_keyboard: [[
 					{
-						text: `💬 Say Gm to @${scannerUsername}`,
-						url: `https://t.me/${scannerUsername}?text=Gm!%20Got%20your%20contact.%20%E2%98%95`
+						text: `📬 Open Inbox to Reply`,
+						url: `https://unrationalizing-nonrecurently-alyse.ngrok-free.dev`
 					}
 				]]
 			};
 		}
 
 		const caption = `✅ *Connection Verified!*\n🔺 *Network:* Avalanche Fuji Testnet\n🔒 *Proof of Connection:* Minted as Soulbound NFT\n🔗 [View on Snowtrace](https://testnet.snowtrace.io/)\n\n*Message:* "${message}"`;
+		const scannedCaption = `📸 @${scannerUsername} just connected with you and minted a memory on Avalanche! Open the app to view their card and reply with your context.`;
 
 		// Use Promise.allSettled to ensure failure on one doesn't crash the other
 		const results = await Promise.allSettled([
@@ -159,7 +160,7 @@ export async function POST(req: NextRequest) {
 			}),
 			// 2. 给 Scanned (被扫的人 - 对方) 发送
 			bot.telegram.sendPhoto(scanned_id_for_db, publicUrl, {
-				caption: caption,
+				caption: scannedCaption,
 				parse_mode: 'Markdown',
 				reply_markup: scannedMarkup
 			})
