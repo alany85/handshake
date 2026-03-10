@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 			scanned_id_for_db = raw_scanned_tg_id;
 		}
 
-		const message = formData.get('custom_message') as string;
+		const message = formData.get('custom_intro') as string;
 		const photo = formData.get('photo') as File | null;
 
 		if (!scanner_tg_id || !scanned_id_for_db || !photo) {
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
 		}
 
 		// 3. Send Telegram Messages to both users
-		const preFilledText = encodeURIComponent(`Gm! ☕️ Great meeting you. Let's build on Avalanche! 🔺`);
+		const encodedIntro = encodeURIComponent(message);
 
 		// 构建给 Scanner 的消息 Keyboard
 		let scannerMarkup = undefined;
@@ -127,8 +127,8 @@ export async function POST(req: NextRequest) {
 			scannerMarkup = {
 				inline_keyboard: [[
 					{ 
-						text: `💬 Chat with ${scannedName}`, 
-						url: `https://t.me/${scanned_username}?text=${preFilledText}` 
+						text: `💬 Send Intro to @${scanned_username}`, 
+						url: `https://t.me/${scanned_username}?text=${encodedIntro}` 
 					}
 				]]
 			};
@@ -140,8 +140,8 @@ export async function POST(req: NextRequest) {
 			scannedMarkup = {
 				inline_keyboard: [[
 					{
-						text: `💬 Chat with ${scannerName}`,
-						url: `https://t.me/${scannerUsername}?text=${preFilledText}`
+						text: `💬 Say Gm to @${scannerUsername}`,
+						url: `https://t.me/${scannerUsername}?text=Gm!%20Got%20your%20contact.%20%E2%98%95`
 					}
 				]]
 			};

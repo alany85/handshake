@@ -16,7 +16,7 @@ export default function Home() {
   const [scannedId, setScannedId] = useState<string | null>(null);
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [customMessage, setCustomMessage] = useState<string>("Gm! Great meeting you at the Avalanche Hacker House! 🔺");
+  const [draftedMessage, setDraftedMessage] = useState<string>("");
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [loadingStepIndex, setLoadingStepIndex] = useState(0);
@@ -75,7 +75,7 @@ export default function Home() {
     }
     draft += " Let's connect and build on Avalanche! 🔺";
     
-    setCustomMessage(draft);
+    setDraftedMessage(draft);
   };
 
   const handleScanQR = () => {
@@ -124,7 +124,7 @@ export default function Home() {
       formData.append('scanner_tg_id', user.id.toString());
       formData.append('scanner_username', user.username || '');
       formData.append('scanned_tg_id', scannedId);
-      formData.append('custom_message', customMessage);
+      formData.append('custom_intro', draftedMessage || "Gm! Great meeting you. Let's build on Avalanche! 🔺");
       formData.append('photo', photo);
 
       const res = await fetch('/api/connect', {
@@ -141,7 +141,7 @@ export default function Home() {
       setScannedId(null);
       setPhoto(null);
       setPhotoPreview(null);
-      setCustomMessage("Gm! Great meeting you at the Avalanche Hacker House! 🔺");
+      setDraftedMessage("");
 
       // Optionally alert them native TMA popup
       webApp?.showAlert("Connection Verified & Minted!");
@@ -326,8 +326,8 @@ export default function Home() {
               </div>
               
               <textarea
-                value={customMessage}
-                onChange={(e) => setCustomMessage(e.target.value)}
+                value={draftedMessage}
+                onChange={(e) => setDraftedMessage(e.target.value)}
                 rows={3}
                 className="w-full bg-slate-950/50 border border-slate-700 text-slate-200 text-sm rounded-xl p-3 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/50 transition-colors placeholder:text-slate-600 font-sans resize-none"
                 placeholder="Write a custom intro message..."
