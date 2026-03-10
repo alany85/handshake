@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 			scanned_id_for_db = raw_scanned_tg_id;
 		}
 
-		const message = formData.get('message') as string;
+		const message = formData.get('custom_message') as string;
 		const photo = formData.get('photo') as File | null;
 
 		if (!scanner_tg_id || !scanned_id_for_db || !photo) {
@@ -50,13 +50,15 @@ export async function POST(req: NextRequest) {
 			);
 		}
 
+		let formScannerUsername = formData.get('scanner_username') as string || '';
+
 		// --- Fetch real profiles from Telegram ---
 		let scannerName = "Someone";
-		let scannerUsername = "";
+		let scannerUsername = formScannerUsername;
 		try {
 			const scannerChat = await bot.telegram.getChat(scanner_tg_id) as any;
 			scannerName = [scannerChat.first_name, scannerChat.last_name].filter(Boolean).join(' ') || "Someone";
-			scannerUsername = scannerChat.username || '';
+			scannerUsername = scannerChat.username || formScannerUsername;
 		} catch (e) {
 			console.log('Could not fetch scanner profile', e);
 		}
@@ -117,7 +119,7 @@ export async function POST(req: NextRequest) {
 		}
 
 		// 3. Send Telegram Messages to both users
-		const preFilledText = encodeURIComponent(`Hey! Nice to meet you at the event! 🚀\n\nMessage: "${message}"\n\nHere is our photo.`);
+		const preFilledText = encodeURIComponent(`Gm! ☕️ Great meeting you. Let's build on Avalanche! 🔺`);
 
 		// 构建给 Scanner 的消息 Keyboard
 		let scannerMarkup = undefined;
@@ -145,16 +147,20 @@ export async function POST(req: NextRequest) {
 			};
 		}
 
+		const caption = `✅ *Connection Verified!*\n🔺 *Network:* Avalanche Fuji Testnet\n🔒 *Proof of Connection:* Minted as Soulbound NFT\n🔗 [View on Snowtrace](https://testnet.snowtrace.io/)\n\n*Message:* "${message}"`;
+
 		// Use Promise.allSettled to ensure failure on one doesn't crash the other
 		const results = await Promise.allSettled([
 			// 1. 给 Scanner (扫码的人 - 你) 发送
 			bot.telegram.sendPhoto(scanner_tg_id, publicUrl, {
-				caption: `✅ You connected with ${scannedName}!\n\nMessage: "${message}"`,
+				caption: caption,
+				parse_mode: 'Markdown',
 				reply_markup: scannerMarkup
 			}),
 			// 2. 给 Scanned (被扫的人 - 对方) 发送
 			bot.telegram.sendPhoto(scanned_id_for_db, publicUrl, {
-				caption: `📸 New connection! ${scannerName} just scanned you.\n\nMessage: "${message}"`,
+				caption: caption,
+				parse_mode: 'Markdown',
 				reply_markup: scannedMarkup
 			})
 		]);
