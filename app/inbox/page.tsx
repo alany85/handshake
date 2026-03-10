@@ -64,7 +64,7 @@ export default function InboxPage() {
 
         if (dbError) throw dbError;
 
-        const formatted = (data || []).map((conn: any) => {
+        const formatted = await Promise.all((data || []).map(async (conn: any) => {
            // Calculate time string mock logic
            const date = new Date(conn.created_at);
            const now = new Date();
@@ -73,16 +73,32 @@ export default function InboxPage() {
            if (diffMins > 60) timeStr = `${Math.floor(diffMins/60)} hours ago`;
            if (diffMins > 1440) timeStr = date.toLocaleDateString();
 
+           let profileName = `User ${conn.scanner_tg_id}`;
+           let profileHandle = conn.scanner_tg_id;
+
+           try {
+             const pRes = await fetch(`/api/profile?id=${conn.scanner_tg_id}`);
+             if (pRes.ok) {
+               const pData = await pRes.json();
+               if (pData.success) {
+                 profileName = pData.name;
+                 profileHandle = pData.handle;
+               }
+             }
+           } catch (e) {
+             console.error("Failed to fetch profile");
+           }
+
            return {
              id: conn.id,
-             name: `User ${conn.scanner_tg_id}`, // In real app, fetch actual name or store it in DB
-             handle: conn.scanner_tg_id,
-             avatar: `https://i.pravatar.cc/150?u=${conn.scanner_tg_id}`,
+             name: profileName,
+             handle: profileHandle,
+             avatar: `/api/avatar?id=${conn.scanner_tg_id}`, // proxy native Telegram avatars
              time: timeStr,
              message: conn.message,
              photo: conn.image_url
            };
-        });
+        }));
 
         setRequests(formatted);
       } catch (err: any) {
@@ -116,8 +132,8 @@ export default function InboxPage() {
   const handleReplyTelegram = () => {
     if (!selectedRequest) return;
     const encodedReply = encodeURIComponent(draftedReply || "Gm! Got your connection! ☕️");
-    const handle = selectedRequest.handle.replace('@', '');
-    window.open(`https://t.me/${handle}?text=${encodedReply}`, '_blank');
+    const targetHandle = selectedRequest.handle.replace('@', '');
+    window.open(`https://t.me/${targetHandle}?text=${encodedReply}`, '_blank');
   };
 
   // ----- Detail View Render -----
@@ -136,11 +152,16 @@ export default function InboxPage() {
           </button>
           <div className="flex items-center gap-3">
              <div className="relative w-8 h-8 rounded-full overflow-hidden border border-gray-200">
-                <Image src={selectedRequest.avatar} fill alt={selectedRequest.name} className="object-cover" />
+                <img 
+                  src={selectedRequest.avatar} 
+                  onError={(e) => { e.currentTarget.src = `https://i.pravatar.cc/150?u=${selectedRequest.handle}` }}
+                  alt={selectedRequest.name} 
+                  className="w-full h-full object-cover" 
+                />
              </div>
              <div>
                <h1 className="text-sm font-bold tracking-tight leading-tight">{selectedRequest.name}</h1>
-               <p className="text-xs text-gray-500">{selectedRequest.handle}</p>
+               <p className="text-xs text-gray-500">{selectedRequest.handle.startsWith('@') ? selectedRequest.handle : `@${selectedRequest.handle}`}</p>
              </div>
           </div>
         </header>
@@ -267,7 +288,12 @@ export default function InboxPage() {
                >
                   <div className="relative w-14 h-14 shrink-0">
                     <div className="absolute inset-0 rounded-full border-2 border-red-100 bg-white p-0.5 overflow-hidden">
-                      <img src={req.avatar} alt="Avatar" className="w-full h-full rounded-full object-cover" />
+                      <img 
+                        src={req.avatar} 
+                        onError={(e) => { e.currentTarget.src = `https://i.pravatar.cc/150?u=${req.handle}` }}
+                        alt="Avatar" 
+                        className="w-full h-full rounded-full object-cover" 
+                      />
                     </div>
                     <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-sm border border-gray-100">
                       <span className="text-xl leading-none">📸</span>
